@@ -270,7 +270,6 @@ async function openGame(game) {
   playerView.classList.remove('hidden');
   $('playerTitle').textContent = game.title;
   $('cloudStatus').textContent = 'Preparing ROM...';
-  document.querySelectorAll('.slot').forEach((button) => button.classList.toggle('selected', button.dataset.slot === '0'));
 
   try {
     const romUrl = await signedUrl('roms', game.rom_path);
@@ -351,7 +350,7 @@ async function startEmulator(game, romUrl) {
   };
 
   window.EJS_onLoadState = () => {
-    $('cloudStatus').textContent = 'Use the cloud slot buttons below to restore a state.';
+    $('cloudStatus').textContent = 'Save state loaded.';
   };
 
   emulatorScript = document.createElement('script');
@@ -365,44 +364,6 @@ async function startEmulator(game, romUrl) {
   };
   document.body.appendChild(emulatorScript);
 }
-
-document.querySelectorAll('.slot').forEach((button) => {
-  button.addEventListener('click', () => {
-    selectedSlot = Number(button.dataset.slot);
-    document.querySelectorAll('.slot').forEach((other) => other.classList.toggle('selected', other === button));
-    $('stateMessage').textContent = `Selected cloud slot ${selectedSlot + 1}.`;
-  });
-});
-
-$('saveCloudBtn').addEventListener('click', async () => {
-  try {
-    if (!window.EJS_emulator) throw new Error('Emulator is not ready.');
-    window.EJS_emulator.pause();
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    await saveStateToCloud(selectedSlot);
-    message($('stateMessage'), `Saved current state to cloud slot ${selectedSlot + 1}.`);
-    $('cloudStatus').textContent = `State synced to slot ${selectedSlot + 1}`;
-  } catch (error) {
-    console.error(error);
-    message($('stateMessage'), error.message || 'Could not save state.', true);
-  }
-});
-
-$('loadCloudBtn').addEventListener('click', async () => {
-  try {
-    if (!window.EJS_emulator) throw new Error('Emulator is not ready.');
-    const loaded = await loadStateFromCloud(selectedSlot);
-    if (!loaded) {
-      message($('stateMessage'), `Cloud slot ${selectedSlot + 1} is empty.`, true);
-      return;
-    }
-    message($('stateMessage'), `Loaded cloud slot ${selectedSlot + 1}.`);
-    $('cloudStatus').textContent = `Cloud slot ${selectedSlot + 1} loaded`;
-  } catch (error) {
-    console.error(error);
-    message($('stateMessage'), error.message || 'Could not load state.', true);
-  }
-});
 
 $('backBtn').addEventListener('click', () => {
   if (window.EJS_terminate) {
