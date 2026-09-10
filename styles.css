@@ -9,10 +9,40 @@
 
 body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #171a24 0, #08090c 45%); }
 
+/* Keep the site's button styles away from EmulatorJS's own controls. */
 button, input, select { font: inherit; }
-button { cursor: pointer; border: 0; border-radius: 9px; padding: 11px 16px; font-weight: 700; background: #7c5cff; color: white; }
-button:hover { filter: brightness(1.08); }
-button.secondary { background: #20242e; color: #e8ebf0; }
+.topbar button,
+.auth-panel button,
+.upload-panel button,
+.game-card button,
+.player-toolbar button,
+.cloud-controls button {
+  cursor: pointer;
+  border: 0;
+  border-radius: 9px;
+  padding: 11px 16px;
+  font-weight: 700;
+  background: #7c5cff;
+  color: white;
+}
+
+.topbar button:hover,
+.auth-panel button:hover,
+.upload-panel button:hover,
+.game-card button:hover,
+.player-toolbar button:hover,
+.cloud-controls button:hover { filter: brightness(1.08); }
+
+.topbar button.secondary,
+.auth-panel button.secondary,
+.upload-panel button.secondary,
+.game-card button.secondary,
+.player-toolbar button.secondary,
+.cloud-controls button.secondary {
+  background: #20242e;
+  color: #e8ebf0;
+}
+
 button.hidden, .hidden { display: none !important; }
 
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 22px 5vw; border-bottom: 1px solid #242833; background: rgba(8,9,12,.86); backdrop-filter: blur(14px); position: sticky; top: 0; z-index: 20; }
@@ -46,9 +76,6 @@ input:focus, select:focus { border-color: #7c5cff; }
 .player-toolbar > div { display: flex; flex-direction: column; gap: 3px; }
 .status { color: #8d95a5; font-size: 12px; }
 
-/* Give EmulatorJS a real box instead of only a min-height. Its internal
-   toolbar/gamepad positioning is calculated from this box, so it must have
-   an explicit height before and during fullscreen transitions. */
 #game {
   position: relative;
   width: 100%;
@@ -65,14 +92,19 @@ input:focus, select:focus { border-color: #7c5cff; }
   height: 100%;
 }
 
-/* When EmulatorJS/browser fullscreen is active, make the player itself fill
-   the viewport too. This keeps the EmulatorJS controls anchored to the
-   fullscreen game instead of the old 70vh player box. */
-#game:fullscreen,
-#game:-webkit-full-screen,
+/* EmulatorJS can fullscreen an internal element instead of #game. Let the
+   actual fullscreen element own the viewport instead of forcing the parent. */
+#game :fullscreen,
+#game :-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
 #game.emulator-fullscreen {
-  position: fixed !important;
-  inset: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
   min-height: 0 !important;
@@ -80,11 +112,8 @@ input:focus, select:focus { border-color: #7c5cff; }
   margin: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
-  z-index: 99999 !important;
 }
 
-#game:fullscreen > div,
-#game:-webkit-full-screen > div,
 #game.emulator-fullscreen > div {
   width: 100% !important;
   height: 100% !important;
