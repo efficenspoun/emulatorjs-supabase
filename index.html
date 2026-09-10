@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Emulator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Cloud Emulator</h1>
+      <p>EmulatorJS + Supabase</p>
+    </div>
+    <div class="account">
+      <span id="userEmail"></span>
+      <button id="logoutBtn" class="secondary hidden">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="authView" class="panel auth-panel">
+      <h2>Sign in</h2>
+      <p class="muted">Your ROMs, saves, and states are isolated to your Supabase account.</p>
+      <form id="authForm">
+        <input id="email" type="email" placeholder="Email" autocomplete="email" required />
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password" minlength="6" required />
+        <div class="row">
+          <button type="submit">Sign in</button>
+          <button type="button" id="signupBtn" class="secondary">Create account</button>
+        </div>
+      </form>
+      <div id="authMessage" class="message"></div>
+    </section>
+
+    <section id="libraryView" class="hidden">
+      <div class="panel upload-panel">
+        <div class="section-heading">
+          <div>
+            <h2>Game library</h2>
+            <p class="muted">Upload your own ROMs to private Supabase Storage.</p>
+          </div>
+        </div>
+        <form id="uploadForm" class="upload-form">
+          <input id="gameTitle" type="text" placeholder="Game title" required />
+          <select id="system" required>
+            <option value="nes">NES</option>
+            <option value="snes">SNES</option>
+            <option value="gb">Game Boy</option>
+            <option value="gbc">Game Boy Color</option>
+            <option value="gba">Game Boy Advance</option>
+            <option value="genesis">Genesis / Mega Drive</option>
+            <option value="mastersystem">Master System</option>
+            <option value="gamegear">Game Gear</option>
+            <option value="atari2600">Atari 2600</option>
+            <option value="psx">PlayStation</option>
+          </select>
+          <input id="romFile" type="file" required />
+          <button type="submit">Upload ROM</button>
+        </form>
+        <div id="uploadMessage" class="message"></div>
+      </div>
+
+      <div id="games" class="game-grid"></div>
+      <div id="emptyLibrary" class="panel empty hidden">No games yet. Upload a ROM above.</div>
+    </section>
+
+    <section id="playerView" class="hidden">
+      <div class="player-toolbar">
+        <button id="backBtn" class="secondary">← Library</button>
+        <div>
+          <strong id="playerTitle">Game</strong>
+          <span id="cloudStatus" class="status">Cloud sync ready</span>
+        </div>
+      </div>
+
+      <div id="game"></div>
+
+      <div class="cloud-controls panel">
+        <div class="section-heading">
+          <div>
+            <h3>Cloud save states</h3>
+            <p class="muted">Save or restore the exact emulator state in one of five cloud slots.</p>
+          </div>
+        </div>
+        <div class="slot-grid">
+          <button class="slot" data-slot="0">Slot 1</button>
+          <button class="slot" data-slot="1">Slot 2</button>
+          <button class="slot" data-slot="2">Slot 3</button>
+          <button class="slot" data-slot="3">Slot 4</button>
+          <button class="slot" data-slot="4">Slot 5</button>
+        </div>
+        <div class="row cloud-actions">
+          <button id="saveCloudBtn">Save current state</button>
+          <button id="loadCloudBtn" class="secondary">Load selected state</button>
+        </div>
+        <div id="stateMessage" class="message"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
