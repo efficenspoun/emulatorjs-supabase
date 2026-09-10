@@ -366,7 +366,6 @@ async function startEmulator(game, romUrl) {
       const manager = window.EJS_emulator?.gameManager;
       if (!manager) throw new Error('Emulator is not ready.');
 
-      manager.EJS?.pause?.();
       $('cloudStatus').textContent = `Loading cloud state ${slot + 1}...`;
       const loaded = await loadStateFromCloud(slot);
 
