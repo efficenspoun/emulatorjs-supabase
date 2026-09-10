@@ -282,11 +282,23 @@ async function openGame(game) {
   }
 }
 
+function syncEmulatorFullscreenClass() {
+  const gameElement = $('game');
+  const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+  const isFullscreen = fullscreenElement === gameElement || gameElement.contains(fullscreenElement);
+  gameElement.classList.toggle('emulator-fullscreen', isFullscreen);
+}
+
+document.addEventListener('fullscreenchange', syncEmulatorFullscreenClass);
+document.addEventListener('webkitfullscreenchange', syncEmulatorFullscreenClass);
+window.addEventListener('resize', syncEmulatorFullscreenClass);
+
 async function startEmulator(game, romUrl) {
   if (window.EJS_terminate) {
     try { window.EJS_terminate(); } catch (_) {}
   }
   $('game').innerHTML = '';
+  $('game').classList.remove('emulator-fullscreen');
 
   window.EJS_player = '#game';
   window.EJS_core = CORES[game.system];
@@ -300,6 +312,7 @@ async function startEmulator(game, romUrl) {
   window.EJS_disableLocalStorage = true;
 
   window.EJS_onGameStart = async () => {
+    syncEmulatorFullscreenClass();
     $('cloudStatus').textContent = 'Emulator ready — restoring cloud data...';
     await new Promise((resolve) => setTimeout(resolve, 400));
 
