@@ -281,23 +281,11 @@ async function openGame(game) {
   }
 }
 
-function syncEmulatorFullscreenClass() {
-  const gameElement = $('game');
-  const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
-  const isFullscreen = fullscreenElement === gameElement || gameElement.contains(fullscreenElement);
-  gameElement.classList.toggle('emulator-fullscreen', isFullscreen);
-}
-
-document.addEventListener('fullscreenchange', syncEmulatorFullscreenClass);
-document.addEventListener('webkitfullscreenchange', syncEmulatorFullscreenClass);
-window.addEventListener('resize', syncEmulatorFullscreenClass);
-
 async function startEmulator(game, romUrl) {
   if (window.EJS_terminate) {
     try { window.EJS_terminate(); } catch (_) {}
   }
   $('game').innerHTML = '';
-  $('game').classList.remove('emulator-fullscreen');
 
   window.EJS_player = '#game';
   window.EJS_core = CORES[game.system];
@@ -310,12 +298,27 @@ async function startEmulator(game, romUrl) {
   window.EJS_fixedSaveInterval = 30;
   window.EJS_disableLocalStorage = true;
 
+  async function waitForGameManager(timeoutMs = 10000) {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const manager = window.EJS_emulator?.gameManager;
+      if (manager?.FS && manager.getSaveFilePath && manager.loadState) return true;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    return false;
+  }
+
   window.EJS_onGameStart = async () => {
-    syncEmulatorFullscreenClass();
     $('cloudStatus').textContent = 'Emulator ready — restoring cloud data...';
-    await new Promise((resolve) => setTimeout(resolve, 400));
 
     try {
+      const ready = await waitForGameManager();
+      if (!ready) throw new Error('Emulator save system was not ready in time.');
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       const restoredSave = await restoreBatterySave();
       const restoredState = await loadStateFromCloud(selectedSlot);
       $('cloudStatus').textContent = restoredState
@@ -325,7 +328,7 @@ async function startEmulator(game, romUrl) {
           : 'Cloud sync ready';
     } catch (error) {
       console.error('Cloud restore failed:', error);
-      $('cloudStatus').textContent = 'Emulator ready — cloud restore failed';
+      $('cloudStatus').textContent = `Emulator ready — cloud restore failed: ${error.message}`;
     }
   };
 
@@ -350,7 +353,7 @@ async function startEmulator(game, romUrl) {
   };
 
   window.EJS_onLoadState = () => {
-    $('cloudStatus').textContent = 'Save state loaded.';
+    $('cloudStatus').textContent = 'EmulatorJS loaded state.';
   };
 
   emulatorScript = document.createElement('script');
