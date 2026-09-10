@@ -19,7 +19,6 @@ const CORES = {
 
 let currentUser = null;
 let currentGame = null;
-let selectedSlot = 0;
 let emulatorScript = null;
 let emulatorStarting = false;
 
@@ -217,7 +216,13 @@ function savePath() {
   return `${currentUser.id}/${currentGame.id}/battery.save`;
 }
 
-async function saveStateToCloud(slot = selectedSlot, state = null) {
+function getEmulatorCloudSlot() {
+  const raw = Number(window.EJS_emulator?.settings?.['save-state-slot'] ?? 1);
+  if (!Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.min(8, Math.trunc(raw) - 1));
+}
+
+async function saveStateToCloud(slot = getEmulatorCloudSlot(), state = null) {
   if (!window.EJS_emulator || !currentGame) throw new Error('Emulator is not ready.');
   const bytes = state || window.EJS_emulator.gameManager.getState();
   if (!bytes || !bytes.length) throw new Error('Emulator did not return a save state.');
@@ -230,7 +235,7 @@ async function saveStateToCloud(slot = selectedSlot, state = null) {
   if (error) throw error;
 }
 
-async function loadStateFromCloud(slot = selectedSlot) {
+async function loadStateFromCloud(slot = getEmulatorCloudSlot()) {
   const bytes = await downloadBytes('states', statePath(slot));
   if (!bytes) return false;
   window.EJS_emulator.gameManager.loadState(bytes);
@@ -264,7 +269,6 @@ async function openGame(game) {
   if (emulatorStarting) return;
   emulatorStarting = true;
   currentGame = game;
-  selectedSlot = 0;
 
   libraryView.classList.add('hidden');
   playerView.classList.remove('hidden');
@@ -317,10 +321,10 @@ async function startEmulator(game, romUrl) {
       const ready = await waitForGameManager();
       if (!ready) throw new Error('Emulator save system was not ready in time.');
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const restoredSave = await restoreBatterySave();
-      const restoredState = await loadStateFromCloud(selectedSlot);
+      const restoredState = await loadStateFromCloud(0);
       $('cloudStatus').textContent = restoredState
         ? 'Cloud state restored'
         : restoredSave
@@ -344,16 +348,38 @@ async function startEmulator(game, romUrl) {
 
   window.EJS_onSaveState = async ({ state }) => {
     try {
-      await saveStateToCloud(selectedSlot, state);
-      $('cloudStatus').textContent = `State synced to slot ${selectedSlot + 1}`;
+      const slot = getEmulatorCloudSlot();
+      await saveStateToCloud(slot, state);
+      $('cloudStatus').textContent = `State ${slot + 1} synced to cloud`;
     } catch (error) {
       console.error(error);
       $('cloudStatus').textContent = 'State sync failed';
     }
   };
 
-  window.EJS_onLoadState = () => {
-    $('cloudStatus').textContent = 'EmulatorJS loaded state.';
+  /* EmulatorJS calls this when the user presses its Load State hotkey/menu.
+     Redirect that action to the matching cloud slot instead of its local
+     file picker, because local EmulatorJS storage is intentionally disabled. */
+  window.EJS_onLoadState = async () => {
+    try {
+      const slot = getEmulatorCloudSlot();
+      const manager = window.EJS_emulator?.gameManager;
+      if (!manager) throw new Error('Emulator is not ready.');
+
+      manager.EJS?.pause?.();
+      $('cloudStatus').textContent = `Loading cloud state ${slot + 1}...`;
+      const loaded = await loadStateFromCloud(slot);
+
+      if (!loaded) {
+        $('cloudStatus').textContent = `Cloud state ${slot + 1} is empty`;
+        return;
+      }
+
+      $('cloudStatus').textContent = `Cloud state ${slot + 1} loaded`;
+    } catch (error) {
+      console.error('Cloud state load failed:', error);
+      $('cloudStatus').textContent = `Cloud state load failed: ${error.message}`;
+    }
   };
 
   emulatorScript = document.createElement('script');
