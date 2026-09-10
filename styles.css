@@ -15,8 +15,7 @@ button, input, select { font: inherit; }
 .auth-panel button,
 .upload-panel button,
 .game-card button,
-.player-toolbar button,
-.cloud-controls button {
+.player-toolbar button {
   cursor: pointer;
   border: 0;
   border-radius: 9px;
@@ -30,15 +29,13 @@ button, input, select { font: inherit; }
 .auth-panel button:hover,
 .upload-panel button:hover,
 .game-card button:hover,
-.player-toolbar button:hover,
-.cloud-controls button:hover { filter: brightness(1.08); }
+.player-toolbar button:hover { filter: brightness(1.08); }
 
 .topbar button.secondary,
 .auth-panel button.secondary,
 .upload-panel button.secondary,
 .game-card button.secondary,
-.player-toolbar button.secondary,
-.cloud-controls button.secondary {
+.player-toolbar button.secondary {
   background: #20242e;
   color: #e8ebf0;
 }
@@ -87,48 +84,52 @@ input:focus, select:focus { border-color: #7c5cff; }
   overflow: hidden;
 }
 
-#game > div {
-  width: 100%;
-  height: 100%;
-}
-
-/* EmulatorJS can fullscreen an internal element instead of #game. Let the
-   actual fullscreen element own the viewport instead of forcing the parent. */
-#game :fullscreen,
-#game :-webkit-full-screen {
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: none !important;
-  max-height: none !important;
-  margin: 0 !important;
-  border-radius: 0 !important;
-}
-
-#game.emulator-fullscreen {
-  width: 100vw !important;
-  height: 100vh !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  margin: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-}
-
-#game.emulator-fullscreen > div {
+/* EmulatorJS owns everything inside #game. Do not force dimensions on its
+   generated children; its own CSS positions the menu bar at the bottom. */
+#game .ejs_parent {
   width: 100% !important;
   height: 100% !important;
 }
 
-.cloud-controls { margin-top: 16px; }
-.slot-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-.slot { background: #1b1f28; border: 1px solid #303642; }
-.slot.selected { background: #7c5cff; border-color: #7c5cff; }
-.cloud-actions { margin-top: 12px; }
+#game .ejs_game {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#game .ejs_menu_bar {
+  top: auto !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  box-sizing: border-box !important;
+}
+
+#game .ejs_menu_button {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  box-sizing: border-box !important;
+}
+
+#game .ejs_menu_bar button {
+  background: transparent !important;
+  color: inherit !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  padding: 7px !important;
+  margin: auto !important;
+  font-weight: 500 !important;
+  width: auto !important;
+  min-height: 0 !important;
+}
 
 @media (max-width: 800px) {
   .topbar { align-items: flex-start; flex-direction: column; }
   .upload-form { grid-template-columns: 1fr; }
-  .slot-grid { grid-template-columns: repeat(2, 1fr); }
   #game { height: 65vh; min-height: 360px; }
 }
 
