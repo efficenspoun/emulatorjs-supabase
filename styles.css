@@ -45,8 +45,51 @@ input:focus, select:focus { border-color: #7c5cff; }
 .player-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 15px; }
 .player-toolbar > div { display: flex; flex-direction: column; gap: 3px; }
 .status { color: #8d95a5; font-size: 12px; }
-#game { min-height: 65vh; background: #000; border: 1px solid #252a35; border-radius: 12px; overflow: hidden; }
-#game > div { height: 100%; }
+
+/* Give EmulatorJS a real box instead of only a min-height. Its internal
+   toolbar/gamepad positioning is calculated from this box, so it must have
+   an explicit height before and during fullscreen transitions. */
+#game {
+  position: relative;
+  width: 100%;
+  height: min(70vh, 760px);
+  min-height: 480px;
+  background: #000;
+  border: 1px solid #252a35;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+#game > div {
+  width: 100%;
+  height: 100%;
+}
+
+/* When EmulatorJS/browser fullscreen is active, make the player itself fill
+   the viewport too. This keeps the EmulatorJS controls anchored to the
+   fullscreen game instead of the old 70vh player box. */
+#game:fullscreen,
+#game:-webkit-full-screen,
+#game.emulator-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  z-index: 99999 !important;
+}
+
+#game:fullscreen > div,
+#game:-webkit-full-screen > div,
+#game.emulator-fullscreen > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .cloud-controls { margin-top: 16px; }
 .slot-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .slot { background: #1b1f28; border: 1px solid #303642; }
@@ -57,5 +100,9 @@ input:focus, select:focus { border-color: #7c5cff; }
   .topbar { align-items: flex-start; flex-direction: column; }
   .upload-form { grid-template-columns: 1fr; }
   .slot-grid { grid-template-columns: repeat(2, 1fr); }
-  #game { min-height: 58vh; }
+  #game { height: 65vh; min-height: 360px; }
+}
+
+@media (max-height: 600px) {
+  #game { height: 75vh; min-height: 320px; }
 }
