@@ -336,7 +336,9 @@ async function startEmulator(game, romUrl) {
   window.EJS_startOnLoaded = true;
   window.EJS_threads = false;
   window.EJS_fixedSaveInterval = 30;
-  window.EJS_disableLocalStorage = true;
+  // Keep EmulatorJS local settings enabled so custom key/controller mappings persist.
+  // Cloud saves and save states are still handled by the Supabase hooks below.
+  window.EJS_disableLocalStorage = false;
 
   async function waitForGameManager(timeoutMs = 10000) {
     const deadline = Date.now() + timeoutMs;
@@ -450,7 +452,7 @@ async function startEmulator(game, romUrl) {
       $('cloudStatus').textContent = `Cloud state ${slot + 1} loaded`;
     } catch (error) {
       console.error('Cloud state load failed:', error);
-      $('cloudStatus').textContent = `Cloud state load failed: ${error.message}`;
+      $('cloudStatus').textContent = `Cloud load failed: ${error.message}`;
     }
   };
 
@@ -475,9 +477,7 @@ $('backBtn').addEventListener('click', () => {
 
 window.addEventListener('beforeunload', () => {
   if (window.EJS_emulator?.gameManager) {
-    try {
-      window.EJS_emulator.gameManager.functions.saveSaveFiles();
-    } catch (_) {}
+    try { window.EJS_emulator.gameManager.functions.saveSaveFiles(); } catch (_) {}
   }
 });
 
