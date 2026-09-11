@@ -54,7 +54,15 @@ async function refreshSession() {
   currentUser = data.session?.user ?? null;
   setLoggedInUI(Boolean(currentUser));
   $('userEmail').textContent = currentUser?.email || '';
-  if (currentUser) await loadGames();
+
+  if (!currentUser) return;
+
+  const requestedGameId = new URLSearchParams(location.search).get('game');
+  if (requestedGameId) {
+    await openGameById(requestedGameId);
+  } else {
+    await loadGames();
+  }
 }
 
 $('authForm').addEventListener('submit', async (event) => {
@@ -98,14 +106,18 @@ $('signupBtn').addEventListener('click', async () => {
 
 $('logoutBtn').addEventListener('click', async () => {
   await db.auth.signOut();
-  location.reload();
+  location.href = location.pathname;
 });
 
 db.auth.onAuthStateChange(async (_event, session) => {
   currentUser = session?.user ?? null;
   $('userEmail').textContent = currentUser?.email || '';
   setLoggedInUI(Boolean(currentUser));
-  if (currentUser) await loadGames();
+  if (currentUser) {
+    const requestedGameId = new URLSearchParams(location.search).get('game');
+    if (requestedGameId) await openGameById(requestedGameId);
+    else await loadGames();
+  }
 });
 
 async function loadGames() {
@@ -134,7 +146,9 @@ async function loadGames() {
       </div>
       <button data-game-id="${game.id}">Play</button>
     `;
-    card.querySelector('button').addEventListener('click', () => openGame(game));
+    card.querySelector('button').addEventListener('click', () => {
+      location.href = `${location.pathname}?game=${encodeURIComponent(game.id)}`;
+    });
     container.appendChild(card);
   }
 }
@@ -216,10 +230,14 @@ function savePath() {
   return `${currentUser.id}/${currentGame.id}/battery.save`;
 }
 
-function getEmulatorCloudSlot() {
-  const raw = Number(window.EJS_emulator?.settings?.['save-state-slot'] ?? 1);
+function normalizeSlot(slot) {
+  const raw = Number(slot);
   if (!Number.isFinite(raw)) return 0;
   return Math.max(0, Math.min(8, Math.trunc(raw) - 1));
+}
+
+function getEmulatorCloudSlot() {
+  return normalizeSlot(window.EJS_emulator?.settings?.['save-state-slot'] ?? 1);
 }
 
 async function saveStateToCloud(slot = getEmulatorCloudSlot(), state = null) {
@@ -265,6 +283,23 @@ async function syncBatterySave(saveBuffer) {
   if (error) console.error('Battery save sync failed:', error);
 }
 
+async function openGameById(gameId) {
+  const { data: game, error } = await db
+    .from('games')
+    .select('*')
+    .eq('id', gameId)
+    .single();
+
+  if (error || !game) {
+    console.error(error);
+    history.replaceState({}, '', location.pathname);
+    await loadGames();
+    return;
+  }
+
+  await openGame(game);
+}
+
 async function openGame(game) {
   if (emulatorStarting) return;
   emulatorStarting = true;
@@ -274,6 +309,7 @@ async function openGame(game) {
   playerView.classList.remove('hidden');
   $('playerTitle').textContent = game.title;
   $('cloudStatus').textContent = 'Preparing ROM...';
+  window.scrollTo({ top: 0, behavior: 'instant' });
 
   try {
     const romUrl = await signedUrl('roms', game.rom_path);
@@ -307,20 +343,60 @@ async function startEmulator(game, romUrl) {
 
     while (Date.now() < deadline) {
       const manager = window.EJS_emulator?.gameManager;
-      if (manager?.FS && manager.getSaveFilePath && manager.loadState) return true;
+      if (manager?.FS && manager.getSaveFilePath && manager.loadState && manager.quickSave && manager.quickLoad) return manager;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    return false;
+    return null;
+  }
+
+  function patchQuickSaveLoad(manager) {
+    if (manager.__cloudQuickSaveLoadPatched) return;
+
+    manager.__cloudQuickSaveLoadPatched = true;
+
+    manager.quickSave = async (slot = 1) => {
+      try {
+        const cloudSlot = normalizeSlot(slot);
+        $('cloudStatus').textContent = `Saving cloud state ${cloudSlot + 1}...`;
+        const state = manager.getState();
+        await saveStateToCloud(cloudSlot, state);
+        $('cloudStatus').textContent = `State ${cloudSlot + 1} synced to cloud`;
+        manager.emulator?.displayMessage?.(`Cloud state ${cloudSlot + 1} saved`, 1800);
+      } catch (error) {
+        console.error('Quick cloud save failed:', error);
+        $('cloudStatus').textContent = `Cloud save failed: ${error.message}`;
+      }
+    };
+
+    manager.quickLoad = async (slot = 1) => {
+      try {
+        const cloudSlot = normalizeSlot(slot);
+        $('cloudStatus').textContent = `Loading cloud state ${cloudSlot + 1}...`;
+        const loaded = await loadStateFromCloud(cloudSlot);
+
+        if (!loaded) {
+          $('cloudStatus').textContent = `Cloud state ${cloudSlot + 1} is empty`;
+          return;
+        }
+
+        $('cloudStatus').textContent = `Cloud state ${cloudSlot + 1} loaded`;
+        manager.emulator?.displayMessage?.(`Cloud state ${cloudSlot + 1} loaded`, 1800);
+      } catch (error) {
+        console.error('Quick cloud load failed:', error);
+        $('cloudStatus').textContent = `Cloud load failed: ${error.message}`;
+      }
+    };
   }
 
   window.EJS_onGameStart = async () => {
     $('cloudStatus').textContent = 'Emulator ready — restoring cloud data...';
 
     try {
-      const ready = await waitForGameManager();
-      if (!ready) throw new Error('Emulator save system was not ready in time.');
+      const manager = await waitForGameManager();
+      if (!manager) throw new Error('Emulator save system was not ready in time.');
 
+      patchQuickSaveLoad(manager);
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const restoredSave = await restoreBatterySave();
@@ -357,9 +433,6 @@ async function startEmulator(game, romUrl) {
     }
   };
 
-  /* EmulatorJS calls this when the user presses its Load State hotkey/menu.
-     Redirect that action to the matching cloud slot instead of its local
-     file picker, because local EmulatorJS storage is intentionally disabled. */
   window.EJS_onLoadState = async () => {
     try {
       const slot = getEmulatorCloudSlot();
@@ -397,7 +470,7 @@ $('backBtn').addEventListener('click', () => {
   if (window.EJS_terminate) {
     try { window.EJS_terminate(); } catch (_) {}
   }
-  location.reload();
+  location.href = location.pathname;
 });
 
 window.addEventListener('beforeunload', () => {
