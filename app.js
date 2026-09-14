@@ -109,15 +109,23 @@ $('logoutBtn').addEventListener('click', async () => {
   location.href = location.pathname;
 });
 
-db.auth.onAuthStateChange(async (_event, session) => {
+db.auth.onAuthStateChange(async (event, session) => {
   currentUser = session?.user ?? null;
   $('userEmail').textContent = currentUser?.email || '';
   setLoggedInUI(Boolean(currentUser));
-  if (currentUser) {
-    const requestedGameId = new URLSearchParams(location.search).get('game');
-    if (requestedGameId) await openGameById(requestedGameId);
-    else await loadGames();
-  }
+
+  if (!currentUser) return;
+
+  // Auth refreshes can happen when a background tab becomes active again.
+  // Never reopen the current game for those events.
+  if (!playerView.classList.contains('hidden') && currentGame) return;
+
+  // Only initial sign-in/session events need to populate the UI.
+  if (!['INITIAL_SESSION', 'SIGNED_IN'].includes(event)) return;
+
+  const requestedGameId = new URLSearchParams(location.search).get('game');
+  if (requestedGameId) await openGameById(requestedGameId);
+  else await loadGames();
 });
 
 async function loadGames() {
@@ -301,6 +309,12 @@ async function openGameById(gameId) {
 }
 
 async function openGame(game) {
+  // The same game can be requested again by Supabase auth events while the
+  // browser tab is inactive. Do not tear down a perfectly good emulator.
+  if (currentGame?.id === game.id && window.EJS_emulator && !playerView.classList.contains('hidden')) {
+    return;
+  }
+
   if (emulatorStarting) return;
   emulatorStarting = true;
   currentGame = game;
