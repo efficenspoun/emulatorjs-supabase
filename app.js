@@ -109,23 +109,19 @@ $('logoutBtn').addEventListener('click', async () => {
   location.href = location.pathname;
 });
 
-db.auth.onAuthStateChange(async (event, session) => {
+// Supabase may emit auth events when a background tab becomes active again.
+// Those events are for session state, not for navigation. Opening the game is
+// handled only by refreshSession() so EmulatorJS is initialized exactly once.
+db.auth.onAuthStateChange((event, session) => {
   currentUser = session?.user ?? null;
   $('userEmail').textContent = currentUser?.email || '';
-  setLoggedInUI(Boolean(currentUser));
 
-  if (!currentUser) return;
+  if (event === 'SIGNED_OUT' || !currentUser) {
+    setLoggedInUI(false);
+    return;
+  }
 
-  // Auth refreshes can happen when a background tab becomes active again.
-  // Never reopen the current game for those events.
-  if (!playerView.classList.contains('hidden') && currentGame) return;
-
-  // Only initial sign-in/session events need to populate the UI.
-  if (!['INITIAL_SESSION', 'SIGNED_IN'].includes(event)) return;
-
-  const requestedGameId = new URLSearchParams(location.search).get('game');
-  if (requestedGameId) await openGameById(requestedGameId);
-  else await loadGames();
+  setLoggedInUI(true);
 });
 
 async function loadGames() {
@@ -309,8 +305,8 @@ async function openGameById(gameId) {
 }
 
 async function openGame(game) {
-  // The same game can be requested again by Supabase auth events while the
-  // browser tab is inactive. Do not tear down a perfectly good emulator.
+  // The same game can be requested again by another part of the app while
+  // the browser tab is inactive. Do not tear down a working emulator.
   if (currentGame?.id === game.id && window.EJS_emulator && !playerView.classList.contains('hidden')) {
     return;
   }
