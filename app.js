@@ -260,7 +260,27 @@ async function saveStateToCloud(slot = getEmulatorCloudSlot(), state = null) {
 async function loadStateFromCloud(slot = getEmulatorCloudSlot()) {
   const bytes = await downloadBytes('states', statePath(slot));
   if (!bytes) return false;
-  window.EJS_emulator.gameManager.loadState(bytes);
+
+  const emulator = window.EJS_emulator;
+  const manager = emulator?.gameManager;
+  if (!manager) throw new Error('Emulator is not ready.');
+
+  // Load the save state while the core is paused. This avoids racing the
+  // running core/audio timing and prevents the brief slow-motion hitch after
+  // a cloud state is applied. Preserve the user's play/pause state afterward.
+  const wasPaused = emulator.paused;
+  if (!wasPaused) emulator.pause();
+
+  try {
+    manager.loadState(bytes);
+  } finally {
+    if (!wasPaused) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      emulator.play();
+    }
+  }
+
   return true;
 }
 
