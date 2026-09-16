@@ -38,13 +38,21 @@
       if (bucket !== 'states' && bucket !== 'saves') return storage;
       if (storage.__freshSaveDownloadPatched) return storage;
 
-      const originalDownload = storage.download.bind(storage);
-
       storage.download = async (path) => {
         const { data, error } = await originalStorageFrom(bucket).createSignedUrl(path, 60);
         if (error) {
-          if (error.message?.toLowerCase().includes('not found')) return { data: null, error: null };
+          if (error.message?.toLowerCase().includes('not found')) {
+            // app.js expects download() to return a Blob when error is null.
+            // Use an empty Blob for a missing optional save so initial restore
+            // can treat it as an empty save instead of calling arrayBuffer()
+            // on null.
+            return { data: new Blob(), error: null };
+          }
           return { data: null, error };
+        }
+
+        if (!data?.signedUrl) {
+          return { data: new Blob(), error: null };
         }
 
         const cacheNonce = `${Date.now()}-${crypto.randomUUID()}`;
@@ -52,7 +60,7 @@
           cache: 'no-store'
         });
 
-        if (response.status === 404) return { data: null, error: null };
+        if (response.status === 404) return { data: new Blob(), error: null };
         if (!response.ok) {
           return {
             data: null,
