@@ -7,6 +7,7 @@
   supabase.createClient = (...args) => {
     const client = originalCreateClient(...args);
     const originalOnAuthStateChange = client.auth.onAuthStateChange.bind(client.auth);
+    const originalStorageFrom = client.storage.from.bind(client.storage);
 
     client.auth.onAuthStateChange = (callback) => {
       return originalOnAuthStateChange((event, session) => {
@@ -25,6 +26,45 @@
 
         callback(event, session);
       });
+    };
+
+    // Save states are overwritten at the same Storage path. Supabase Storage
+    // can serve a cached copy of that path immediately after an upsert, which
+    // can make a fresh save appear to be an old save. Force fresh reads for
+    // the two frequently-replaced save buckets only.
+    client.storage.from = (bucket) => {
+      const storage = originalStorageFrom(bucket);
+
+      if (bucket !== 'states' && bucket !== 'saves') return storage;
+      if (storage.__freshSaveDownloadPatched) return storage;
+
+      const originalDownload = storage.download.bind(storage);
+
+      storage.download = async (path) => {
+        const { data, error } = await originalStorageFrom(bucket).createSignedUrl(path, 60);
+        if (error) {
+          if (error.message?.toLowerCase().includes('not found')) return { data: null, error: null };
+          return { data: null, error };
+        }
+
+        const cacheNonce = `${Date.now()}-${crypto.randomUUID()}`;
+        const response = await fetch(`${data.signedUrl}&cacheNonce=${cacheNonce}`, {
+          cache: 'no-store'
+        });
+
+        if (response.status === 404) return { data: null, error: null };
+        if (!response.ok) {
+          return {
+            data: null,
+            error: new Error(`Cloud download failed (${response.status}).`)
+          };
+        }
+
+        return { data: await response.blob(), error: null };
+      };
+
+      storage.__freshSaveDownloadPatched = true;
+      return storage;
     };
 
     return client;
